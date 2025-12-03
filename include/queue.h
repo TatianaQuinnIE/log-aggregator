@@ -37,6 +37,12 @@ typedef struct {
 int queue_init(log_queue_t* queue, size_t max_size);
 
 /**
+ * @brief Mark queue as shutdown and wake waiting threads
+ * @param queue Queue to shutdown
+ */
+void queue_shutdown(log_queue_t* queue);
+
+/**
  * @brief Destroy a log queue and free resources
  * @param queue Queue to destroy
  */

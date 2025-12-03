@@ -36,6 +36,11 @@ static void* processor_thread_func(void* arg) {
     while (processor->running) {
         log_entry_t* entry = queue_dequeue(processor->input_queue);
         if (!entry) {
+            // If queue returned NULL, it might be shutdown
+            // Check running flag and exit if needed
+            if (!processor->running) {
+                break;
+            }
             continue;
         }
         

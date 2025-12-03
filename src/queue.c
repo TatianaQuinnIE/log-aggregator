@@ -35,7 +35,7 @@ int queue_init(log_queue_t* queue, size_t max_size) {
     return 0;
 }
 
-void queue_destroy(log_queue_t* queue) {
+void queue_shutdown(log_queue_t* queue) {
     if (!queue) {
         return;
     }
@@ -50,6 +50,15 @@ void queue_destroy(log_queue_t* queue) {
     pthread_cond_broadcast(&queue->not_full);
     
     pthread_mutex_unlock(&queue->mutex);
+}
+
+void queue_destroy(log_queue_t* queue) {
+    if (!queue) {
+        return;
+    }
+    
+    // Mark as shutdown first (if not already)
+    queue_shutdown(queue);
     
     // Give threads a moment to exit (they should exit quickly)
     // Small delay to allow threads to wake up and check shutdown flag

@@ -39,6 +39,11 @@ static void* alerter_thread_func(void* arg) {
     while (alerter->running) {
         log_entry_t* entry = queue_dequeue(alerter->alert_queue);
         if (!entry) {
+            // If queue returned NULL, it might be shutdown
+            // Check running flag and exit if needed
+            if (!alerter->running) {
+                break;
+            }
             continue;
         }
         

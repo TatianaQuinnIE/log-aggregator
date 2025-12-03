@@ -239,7 +239,11 @@ int main(int argc, char* argv[]) {
     
     printf("\nShutting down...\n");
     
-    // Stop components first (this sets running flags to false)
+    // Mark queues as shutdown first (this wakes up waiting threads)
+    queue_shutdown(&input_queue);
+    queue_shutdown(&alert_queue);
+    
+    // Stop components (this sets running flags to false and waits for threads)
     alerter_stop(&alerter);
     processor_stop(&processor);
     
@@ -253,7 +257,7 @@ int main(int argc, char* argv[]) {
         }
     }
     
-    // Destroy queues (this wakes up any waiting threads)
+    // Now destroy queues (cleanup remaining entries and resources)
     queue_destroy(&alert_queue);
     queue_destroy(&input_queue);
     
