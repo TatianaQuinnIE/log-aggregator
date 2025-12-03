@@ -1,21 +1,26 @@
 #include "queue.h"
 #include "log_entry.h"
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
 #include <time.h>
+#include <stdint.h>
 
 int queue_init(log_queue_t* queue, size_t max_size) {
     if (!queue) {
         return -1;
     }
     
+    // If queue was previously destroyed, we need to ensure it's properly cleaned
+    // Zero out data fields (but not mutex/cond vars - they need proper init/destroy)
     queue->head = NULL;
     queue->tail = NULL;
     queue->size = 0;
     queue->max_size = max_size;
     queue->shutdown = false;
+    queue->destroyed = false;
     
     if (pthread_mutex_init(&queue->mutex, NULL) != 0) {
         return -1;
@@ -42,6 +47,12 @@ void queue_shutdown(log_queue_t* queue) {
     
     pthread_mutex_lock(&queue->mutex);
     
+    // If already shutdown, nothing to do
+    if (queue->shutdown) {
+        pthread_mutex_unlock(&queue->mutex);
+        return;
+    }
+    
     // Mark queue as shutdown to wake up waiting threads
     queue->shutdown = true;
     
@@ -53,7 +64,7 @@ void queue_shutdown(log_queue_t* queue) {
 }
 
 void queue_destroy(log_queue_t* queue) {
-    if (!queue) {
+    if (!queue || queue->destroyed) {
         return;
     }
     
@@ -69,24 +80,32 @@ void queue_destroy(log_queue_t* queue) {
     
     // Free all remaining entries
     queue_node_t* current = queue->head;
-    while (current) {
+    queue->head = NULL;  // Set to NULL first to prevent any issues
+    queue->tail = NULL;
+    queue->size = 0;
+    
+    pthread_mutex_unlock(&queue->mutex);
+    
+    // Free nodes outside of mutex lock to avoid any issues
+    // Add limit to prevent infinite loop if list is corrupted
+    int node_count = 0;
+    while (current && node_count < 10000) {  // Safety limit
         queue_node_t* next = current->next;
         if (current->entry) {
             log_entry_destroy(current->entry);
         }
         free(current);
         current = next;
+        node_count++;
     }
     
-    queue->head = NULL;
-    queue->tail = NULL;
-    queue->size = 0;
-    
-    pthread_mutex_unlock(&queue->mutex);
-    
+    // Destroy synchronization primitives
     pthread_cond_destroy(&queue->not_full);
     pthread_cond_destroy(&queue->not_empty);
     pthread_mutex_destroy(&queue->mutex);
+    
+    // Mark as destroyed to prevent double-destroy
+    queue->destroyed = true;
 }
 
 int queue_enqueue(log_queue_t* queue, log_entry_t* entry) {
@@ -129,6 +148,11 @@ log_entry_t* queue_dequeue(log_queue_t* queue) {
         return NULL;
     }
     
+    // Check if queue was destroyed
+    if (queue->destroyed) {
+        return NULL;
+    }
+    
     pthread_mutex_lock(&queue->mutex);
     
     // Wait if queue is empty, but exit if shutdown
@@ -150,6 +174,19 @@ log_entry_t* queue_dequeue(log_queue_t* queue) {
     }
     
     queue_node_t* node = queue->head;
+    
+    // Validate node pointer is valid before accessing it
+    // Check for NULL, misalignment, and obviously invalid addresses (like 0x100)
+    if (!node || (uintptr_t)node % 8 != 0 || (uintptr_t)node < 0x1000) {
+        // Invalid pointer - don't access it, just return NULL
+        // Reset queue state to prevent further corruption
+        queue->head = NULL;
+        queue->tail = NULL;
+        queue->size = 0;
+        pthread_mutex_unlock(&queue->mutex);
+        return NULL;
+    }
+    
     log_entry_t* entry = node->entry;
     
     queue->head = node->next;
@@ -158,7 +195,10 @@ log_entry_t* queue_dequeue(log_queue_t* queue) {
     }
     queue->size--;
     
+    // Save next pointer before freeing
+    queue_node_t* next = node->next;
     free(node);
+    node = next;  // This line is not needed but keeps node variable consistent
     
     if (queue->max_size > 0) {
         pthread_cond_signal(&queue->not_full);

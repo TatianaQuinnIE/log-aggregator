@@ -23,6 +23,7 @@ typedef struct {
     size_t size;
     size_t max_size;
     bool shutdown;
+    bool destroyed;
     pthread_mutex_t mutex;
     pthread_cond_t not_empty;
     pthread_cond_t not_full;
