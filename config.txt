@@ -1,0 +1,27 @@
+# Log Aggregator Configuration File
+# Lines starting with # are comments
+
+# File monitoring settings
+poll_interval=5
+watch_directory0=logs
+
+# Network settings
+network_port=8080
+enable_network=false
+
+# Queue settings
+queue_max_size=1000
+
+# Processing settings
+num_processing_threads=2
+
+# Alerting settings
+enable_alerts=true
+alert_file=alerts.log
+alert_threshold=WARNING
+
+# Alert patterns (logs containing these strings will trigger alerts)
+alert_pattern0=ERROR
+alert_pattern1=CRITICAL
+alert_pattern2=failed
+alert_pattern3=exception

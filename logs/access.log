@@ -1,0 +1,6 @@
+[INFO] GET /index.html 200
+[INFO] GET /about.html 200
+[WARNING] GET /missing.html 404
+[INFO] POST /api/login 200
+[ERROR] POST /api/data 500
+[INFO] GET /static/style.css 200

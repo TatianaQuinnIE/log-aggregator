@@ -1,0 +1,7 @@
+[INFO] Application started
+[INFO] Loading configuration
+[WARNING] Configuration file not found, using defaults
+[INFO] Database connection established
+[ERROR] Failed to process user request
+[INFO] Request completed
+[CRITICAL] System out of memory
