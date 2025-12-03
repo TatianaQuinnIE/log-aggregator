@@ -22,6 +22,7 @@ typedef struct {
     queue_node_t* tail;
     size_t size;
     size_t max_size;
+    bool shutdown;
     pthread_mutex_t mutex;
     pthread_cond_t not_empty;
     pthread_cond_t not_full;
